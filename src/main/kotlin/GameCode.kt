@@ -86,15 +86,15 @@ data class GameData(
             it.priority = if (it.production == 0) {
                 -100000f
             } else {
-                it.priority * it.production * 2
+                it.priority * it.production
             }
         }.onEach {
             if (it.owner != Factory.FactoryOwner.ME) {
-                it.priority = it.priority - myFactory.distanceToOther[it.id]!! * 15
+                it.priority = it.priority - myFactory.distanceToOther[it.id]!! * 100
             }
         }.onEach {
             if (it.owner != Factory.FactoryOwner.ME) {
-                it.priority = it.priority - it.cyborgsCount * 10
+                it.priority = it.priority - it.cyborgsCount * 30
             }
         }.sortedBy {
             it.priority
