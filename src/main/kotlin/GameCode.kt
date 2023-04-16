@@ -320,7 +320,12 @@ private fun handleAll(gameData: GameData): List<String> {
                         }
 
                         Factory.FactoryOwner.ENEMY -> {
-                            targetFactory.cyborgsCount + enemyCyborgsOnTheWayCount + 1 + (targetFactory.distanceToOther[myFactory.id]!! * targetFactory.production) - myCyborgsOnTheWayCount
+                            val reallyRequired = targetFactory.cyborgsCount + enemyCyborgsOnTheWayCount + 1 + (targetFactory.distanceToOther[myFactory.id]!! * targetFactory.production) - myCyborgsOnTheWayCount
+                            if (gameData.idleTurnsInARow > 15) {
+                                reallyRequired - gameData.idleTurnsInARow * 2
+                            } else {
+                                reallyRequired
+                            }
                         }
 
                         Factory.FactoryOwner.NEUTRAL -> {
@@ -396,7 +401,7 @@ private fun Factory.shouldExecuteRunBitchRunProtocol(
     gameData.activeEnemyBombs.forEach { bomb ->
         val distanceToLaunch = distanceToOther[bomb.sourceFactoryId]
         val runningTurns = gameData.currentTurn - bomb.detectedOnTurn
-         if (distanceToLaunch == runningTurns + 1) {
+        if (distanceToLaunch == runningTurns + 1) {
             return true
         }
     }
