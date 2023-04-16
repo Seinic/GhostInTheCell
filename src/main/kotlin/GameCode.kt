@@ -64,6 +64,7 @@ data class GameData(
     val troops: MutableList<Troop>,
     val bombs: MutableList<Bomb>,
     var mySentBombsCount: Int = 0,
+    var bombSentThisTurn: Boolean = false,
     var idleTurnsInARow: Int = 0,
     var activeEnemyBombs: List<Bomb.ActiveEnemyBomb> = listOf()
 ) {
@@ -207,6 +208,7 @@ fun main(args: Array<String>) {
     while (true) {
         gameData.clearData()
         gameData.currentTurn++
+        gameData.bombSentThisTurn = false
         val entityCount = input.nextInt() // the number of entities (e.g. factories and troops)
         for (i in 0 until entityCount) {
             val entityId = input.nextInt()
@@ -306,6 +308,7 @@ private fun handleAll(gameData: GameData): List<String> {
             actions.add("INC ${myFactory.id}")
         } else if (bombTimeResult != null && bombTimeResult.first == myFactory.id) {
             gameData.mySentBombsCount++
+            gameData.bombSentThisTurn = true
             actions.add("BOMB ${bombTimeResult.first} ${bombTimeResult.second}")
         } else {
             gameData.getTargetFactoriesSortedByPriority(
@@ -378,26 +381,28 @@ private fun handleAll(gameData: GameData): List<String> {
     Otherwise returns null
  */
 private fun bombTime(gameData: GameData): Pair<Int, Int>? {
-    // check if bombs still available to send
-    if (gameData.mySentBombsCount < 2) {
-        // check if no neutral factories (basically midgame check, so no bombs are sent at the start)
-        if (gameData.factories.none { it.owner == Factory.FactoryOwner.NEUTRAL }) {
-            // search for a 3 production enemy factory
-            gameData.factories.firstOrNull { it.owner == Factory.FactoryOwner.ENEMY && it.production == 3 && it.turnsBeforeProduction == 0}
-                ?.let { target ->
-                    // create a list of all my factories ID
-                    val myFactoryIDs = gameData.factories.filter { it.owner == Factory.FactoryOwner.ME }.map { it.id }
-                    // sort distance to other factories
-                    target.distanceToOther.toList().sortedBy { it.second }.toMap().keys.forEach {
-                        if (myFactoryIDs.contains(it)) {
-                            // check if no bomb on the way to target factory
-                            if (gameData.bombs.none { bomb -> bomb.targetFactoryId == target.id }) {
-                                // on my closest factory found bomb time!
-                                return Pair(it, target.id)
+    if (gameData.bombSentThisTurn.not()) {
+        // check if bombs still available to send
+        if (gameData.mySentBombsCount < 2) {
+            // check if no neutral factories (basically midgame check, so no bombs are sent at the start)
+            if (gameData.factories.none { it.owner == Factory.FactoryOwner.NEUTRAL }) {
+                // search for a 3 production enemy factory
+                gameData.factories.firstOrNull { it.owner == Factory.FactoryOwner.ENEMY && it.production == 3 && it.turnsBeforeProduction == 0}
+                    ?.let { target ->
+                        // create a list of all my factories ID
+                        val myFactoryIDs = gameData.factories.filter { it.owner == Factory.FactoryOwner.ME }.map { it.id }
+                        // sort distance to other factories
+                        target.distanceToOther.toList().sortedBy { it.second }.toMap().keys.forEach {
+                            if (myFactoryIDs.contains(it)) {
+                                // check if no bomb on the way to target factory
+                                if (gameData.bombs.none { bomb -> bomb.targetFactoryId == target.id }) {
+                                    // on my closest factory found bomb time!
+                                    return Pair(it, target.id)
+                                }
                             }
                         }
                     }
-                }
+            }
         }
     }
     return null
