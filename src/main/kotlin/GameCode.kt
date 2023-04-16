@@ -320,7 +320,8 @@ private fun handleAll(gameData: GameData): List<String> {
                         }
 
                         Factory.FactoryOwner.ENEMY -> {
-                            val reallyRequired = targetFactory.cyborgsCount + enemyCyborgsOnTheWayCount + 1 + (targetFactory.distanceToOther[myFactory.id]!! * targetFactory.production) - myCyborgsOnTheWayCount
+                            val reallyRequired =
+                                targetFactory.cyborgsCount + enemyCyborgsOnTheWayCount + 1 + (targetFactory.distanceToOther[myFactory.id]!! * targetFactory.production) - myCyborgsOnTheWayCount
                             if (gameData.idleTurnsInARow > 15) {
                                 reallyRequired - gameData.idleTurnsInARow * 2
                             } else {
@@ -345,7 +346,7 @@ private fun handleAll(gameData: GameData): List<String> {
                     }
                 }
                 if (myFactory.shouldExecuteRunBitchRunProtocol(gameData)) {
-                    priorityTargetsList.firstOrNull()?.let { firstPriorityTarget ->
+                    priorityTargetsList.firstOrNull { it.id != myFactory.id }?.let { firstPriorityTarget ->
                         actions.add(
                             moveTroops(
                                 sourceFactoryId = myFactory.id,
