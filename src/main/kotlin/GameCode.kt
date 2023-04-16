@@ -1,6 +1,4 @@
 import java.util.*
-import java.io.*
-import java.math.*
 
 
 // DATA
@@ -45,6 +43,12 @@ data class Bomb(
         ME,
         ENEMY
     }
+
+    data class ActiveEnemyBomb(
+        val id: Int,
+        val sourceFactoryId: Int,
+        val detectedOnTurn: Int
+    )
 }
 
 data class FactoryRelations(
@@ -54,11 +58,13 @@ data class FactoryRelations(
 )
 
 data class GameData(
+    var currentTurn: Int = 0,
     val factories: MutableList<Factory>,
     val troops: MutableList<Troop>,
     val bombs: MutableList<Bomb>,
-    var sentBombsCount: Int = 0,
-    var idleTurnsInARow: Int = 0
+    var mySentBombsCount: Int = 0,
+    var idleTurnsInARow: Int = 0,
+    var activeEnemyBombs: List<Bomb.ActiveEnemyBomb> = listOf()
 ) {
     fun clearData() {
         factories.clear()
@@ -128,6 +134,36 @@ data class GameData(
         }
     }
 
+    /*
+        if bomb no longer active remove from active enemy mobs list
+        if bomb missing add to active enemy bmbs list
+     */
+    fun updateEnemyBombsData() {
+        val enemyBombsThisTurn = bombs.filter { it.owner == Bomb.BombOwner.ENEMY }
+        val listCopy = activeEnemyBombs.toMutableList()
+        activeEnemyBombs.forEach { lastTurnData ->
+            enemyBombsThisTurn.firstOrNull { it.id == lastTurnData.id }.let { matchedBomb ->
+                if (matchedBomb == null) {
+                    listCopy.remove(lastTurnData)
+                }
+            }
+        }
+        enemyBombsThisTurn.forEach { currentTurnData ->
+            activeEnemyBombs.firstOrNull { it.id == currentTurnData.id }.let { matchedBomb ->
+                if (matchedBomb == null) {
+                    listCopy.add(
+                        Bomb.ActiveEnemyBomb(
+                            id = currentTurnData.id,
+                            sourceFactoryId = currentTurnData.sourceFactoryId,
+                            detectedOnTurn = currentTurn
+                        )
+                    )
+                }
+            }
+        }
+        activeEnemyBombs = listCopy
+    }
+
     fun getTroopsOnTheWayTo(
         factory: Factory,
         owner: Troop.TroopOwner
@@ -161,9 +197,9 @@ fun main(args: Array<String>) {
     )
 
     // game loop
-    var gameTurn = 0
     while (true) {
         gameData.clearData()
+        gameData.currentTurn++
         val entityCount = input.nextInt() // the number of entities (e.g. factories and troops)
         for (i in 0 until entityCount) {
             val entityId = input.nextInt()
@@ -238,6 +274,7 @@ fun main(args: Array<String>) {
                 }
             }
         }
+        gameData.updateEnemyBombsData()
 
         handleAll(gameData).joinToString(separator = "; ").let {
             if (it.isEmpty()) {
@@ -248,8 +285,6 @@ fun main(args: Array<String>) {
                 println(it)
             }
         }
-
-        gameTurn++
     }
 }
 
@@ -262,44 +297,57 @@ private fun handleAll(gameData: GameData): List<String> {
         if (gameData.shouldIncrement(myFactory)) {
             actions.add("INC ${myFactory.id}")
         } else if (bombTimeResult != null && bombTimeResult.first == myFactory.id) {
-            gameData.sentBombsCount++
+            gameData.mySentBombsCount++
             actions.add("BOMB ${bombTimeResult.first} ${bombTimeResult.second}")
         } else {
             gameData.getTargetFactoriesSortedByPriority(
                 myFactory = myFactory
-            ).filter { it.id != myFactory.id }.forEach { targetFactory ->
-                val myCyborgsOnTheWayCount = gameData.getTroopsOnTheWayTo(
-                    factory = targetFactory,
-                    owner = Troop.TroopOwner.ME
-                ).sumOf { it.cyborgsCount }
+            ).let { priorityTargetsList ->
+                priorityTargetsList.filter { it.id != myFactory.id }.forEach { targetFactory ->
+                    val myCyborgsOnTheWayCount = gameData.getTroopsOnTheWayTo(
+                        factory = targetFactory,
+                        owner = Troop.TroopOwner.ME
+                    ).sumOf { it.cyborgsCount }
 
-                val enemyCyborgsOnTheWayCount = gameData.getTroopsOnTheWayTo(
-                    factory = targetFactory,
-                    owner = Troop.TroopOwner.ENEMY
-                ).sumOf { it.cyborgsCount }
+                    val enemyCyborgsOnTheWayCount = gameData.getTroopsOnTheWayTo(
+                        factory = targetFactory,
+                        owner = Troop.TroopOwner.ENEMY
+                    ).sumOf { it.cyborgsCount }
 
-                val requiredCyborgsCount = when (targetFactory.owner) {
-                    Factory.FactoryOwner.ME -> {
-                        enemyCyborgsOnTheWayCount - targetFactory.cyborgsCount
+                    val requiredCyborgsCount = when (targetFactory.owner) {
+                        Factory.FactoryOwner.ME -> {
+                            enemyCyborgsOnTheWayCount - targetFactory.cyborgsCount
+                        }
+
+                        Factory.FactoryOwner.ENEMY -> {
+                            targetFactory.cyborgsCount + enemyCyborgsOnTheWayCount + 1 + (targetFactory.distanceToOther[myFactory.id]!! * targetFactory.production) - myCyborgsOnTheWayCount
+                        }
+
+                        Factory.FactoryOwner.NEUTRAL -> {
+                            targetFactory.cyborgsCount + enemyCyborgsOnTheWayCount + 1 - myCyborgsOnTheWayCount
+                        }
                     }
 
-                    Factory.FactoryOwner.ENEMY -> {
-                        targetFactory.cyborgsCount + enemyCyborgsOnTheWayCount + 1 + (targetFactory.distanceToOther[myFactory.id]!! * targetFactory.production) - myCyborgsOnTheWayCount
-                    }
-
-                    Factory.FactoryOwner.NEUTRAL -> {
-                        targetFactory.cyborgsCount + enemyCyborgsOnTheWayCount + 1 - myCyborgsOnTheWayCount
+                    if (myFactory.cyborgsCount >= requiredCyborgsCount && requiredCyborgsCount > 0) {
+                        myFactory.cyborgsCount -= requiredCyborgsCount
+                        moveTroops(
+                            sourceFactoryId = myFactory.id,
+                            destinationFactory = targetFactory.id,
+                            cyborgsCount = requiredCyborgsCount
+                        ).apply {
+                            actions.add(this)
+                        }
                     }
                 }
-
-                if (myFactory.cyborgsCount >= requiredCyborgsCount && requiredCyborgsCount > 0) {
-                    myFactory.cyborgsCount -= requiredCyborgsCount
-                    moveTroops(
-                        sourceFactoryId = myFactory.id,
-                        destinationFactory = targetFactory.id,
-                        cyborgsCount = requiredCyborgsCount
-                    ).apply {
-                        actions.add(this)
+                if (myFactory.shouldExecuteRunBitchRunProtocol(gameData)) {
+                    priorityTargetsList.firstOrNull()?.let { firstPriorityTarget ->
+                        actions.add(
+                            moveTroops(
+                                sourceFactoryId = myFactory.id,
+                                destinationFactory = firstPriorityTarget.id,
+                                cyborgsCount = myFactory.cyborgsCount
+                            )
+                        )
                     }
                 }
             }
@@ -315,7 +363,7 @@ private fun handleAll(gameData: GameData): List<String> {
  */
 private fun bombTime(gameData: GameData): Pair<Int, Int>? {
     // check if bombs still available to send
-    if (gameData.sentBombsCount < 2) {
+    if (gameData.mySentBombsCount < 2) {
         // check if no neutral factories (basically midgame check, so no bombs are sent at the start)
         if (gameData.factories.none { it.owner == Factory.FactoryOwner.NEUTRAL }) {
             // search for a 3 production enemy factory
@@ -337,6 +385,22 @@ private fun bombTime(gameData: GameData): Pair<Int, Int>? {
         }
     }
     return null
+}
+
+/*
+    Check if given factory could be the target of an enemy bomb explosion next turn
+ */
+private fun Factory.shouldExecuteRunBitchRunProtocol(
+    gameData: GameData
+): Boolean {
+    gameData.activeEnemyBombs.forEach { bomb ->
+        val distanceToLaunch = distanceToOther[bomb.sourceFactoryId]
+        val runningTurns = gameData.currentTurn - bomb.detectedOnTurn
+         if (distanceToLaunch == runningTurns + 1) {
+            return true
+        }
+    }
+    return false
 }
 
 private fun moveTroops(
