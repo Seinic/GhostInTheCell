@@ -1,5 +1,8 @@
 import java.util.*
 
+// todo no bomb issue
+// todo if n idle, and this turn is idle, try send trom all factories to highest enemy priority
+// todo no rinforcements to my factory if enemy bomb otw
 
 // DATA
 data class Factory(
@@ -87,11 +90,11 @@ data class GameData(
             it.priority = if (it.production == 0) {
                 -100000f
             } else {
-                it.priority * it.production
+                it.priority * it.production * 2
             }
         }.onEach {
             if (it.owner != Factory.FactoryOwner.ME) {
-                it.priority = it.priority - myFactory.distanceToOther[it.id]!! * 100
+                it.priority = it.priority - myFactory.distanceToOther[it.id]!! * 50
             }
         }.onEach {
             if (it.owner != Factory.FactoryOwner.ME) {
@@ -326,6 +329,11 @@ private fun handleAll(gameData: GameData): List<String> {
                             owner = Troop.TroopOwner.ENEMY
                         ).sumOf { it.cyborgsCount }
 
+                        val enemyCyborgsOnTheWayToMyFactoryCount = gameData.getTroopsOnTheWayTo(
+                            factory = myFactory,
+                            owner = Troop.TroopOwner.ENEMY
+                        ).sumOf { it.cyborgsCount }
+
                         val requiredCyborgsCount = when (targetFactory.owner) {
                             Factory.FactoryOwner.ME -> {
                                 enemyCyborgsOnTheWayCount - targetFactory.cyborgsCount
@@ -346,7 +354,7 @@ private fun handleAll(gameData: GameData): List<String> {
                             }
                         }
 
-                        if (myFactory.cyborgsCount >= requiredCyborgsCount && requiredCyborgsCount > 0) {
+                        if (myFactory.cyborgsCount - enemyCyborgsOnTheWayToMyFactoryCount >= requiredCyborgsCount && requiredCyborgsCount > 0) {
                             myFactory.cyborgsCount -= requiredCyborgsCount
                             moveTroops(
                                 sourceFactoryId = myFactory.id,
