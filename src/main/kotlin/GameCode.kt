@@ -83,7 +83,7 @@ data class GameData(
             }
         }.onEach {
             if (it.owner != Factory.FactoryOwner.ME) {
-                it.priority = it.priority - myFactory.distanceToOther[it.id]!!*15
+                it.priority = it.priority - myFactory.distanceToOther[it.id]!! * 15
             }
         }.onEach {
             if (it.owner != Factory.FactoryOwner.ME) {
@@ -136,7 +136,7 @@ data class GameData(
     }
 }
 
-fun main(args : Array<String>) {
+fun main(args: Array<String>) {
     val input = Scanner(System.`in`)
     val factoryCount = input.nextInt() // the number of factories
     val linkCount = input.nextInt() // the number of links between factories
@@ -189,13 +189,14 @@ fun main(args : Array<String>) {
                         )
                     )
                 }
+
                 "TROOP" -> {
                     gameData.troops.add(
                         Troop(
                             id = entityId,
                             owner = if (arg1 == 1) {
                                 Troop.TroopOwner.ME
-                            } else{
+                            } else {
                                 Troop.TroopOwner.ENEMY
                             },
                             sourceFactoryId = arg2,
@@ -205,6 +206,7 @@ fun main(args : Array<String>) {
                         )
                     )
                 }
+
                 "BOMB" -> {
                     gameData.bombs.add(
                         Bomb(
@@ -239,7 +241,7 @@ fun main(args : Array<String>) {
 
         handleAll(gameData).joinToString(separator = "; ").let {
             if (it.isEmpty()) {
-                gameData.idleTurnsInARow ++
+                gameData.idleTurnsInARow++
                 doNothing()
             } else {
                 gameData.idleTurnsInARow = 0
@@ -247,7 +249,7 @@ fun main(args : Array<String>) {
             }
         }
 
-        gameTurn ++
+        gameTurn++
     }
 }
 
@@ -260,7 +262,7 @@ private fun handleAll(gameData: GameData): List<String> {
         if (gameData.shouldIncrement(myFactory)) {
             actions.add("INC ${myFactory.id}")
         } else if (bombTimeResult != null && bombTimeResult.first == myFactory.id) {
-            gameData.sentBombsCount ++
+            gameData.sentBombsCount++
             actions.add("BOMB ${bombTimeResult.first} ${bombTimeResult.second}")
         } else {
             gameData.getTargetFactoriesSortedByPriority(
@@ -317,20 +319,21 @@ private fun bombTime(gameData: GameData): Pair<Int, Int>? {
         // check if no neutral factories (basically midgame check, so no bombs are sent at the start)
         if (gameData.factories.none { it.owner == Factory.FactoryOwner.NEUTRAL }) {
             // search for a 3 production enemy factory
-            gameData.factories.firstOrNull { it.owner == Factory.FactoryOwner.ENEMY && it.production == 3 }?.let { target ->
-                // create a list of all my factories ID
-                val myFactoryIDs = gameData.factories.filter { it.owner == Factory.FactoryOwner.ME }.map { it.id }
-                // sort distance to other factories
-                target.distanceToOther.toList().sortedBy { it.second }.toMap().keys.forEach {
-                    if (myFactoryIDs.contains(it)) {
-                        // check if no bomb on the way to target factory
-                        if (gameData.bombs.none { bomb -> bomb.targetFactoryId == target.id }) {
-                            // on my closest factory found bomb time!
-                            return Pair(it, target.id)
+            gameData.factories.firstOrNull { it.owner == Factory.FactoryOwner.ENEMY && it.production == 3 }
+                ?.let { target ->
+                    // create a list of all my factories ID
+                    val myFactoryIDs = gameData.factories.filter { it.owner == Factory.FactoryOwner.ME }.map { it.id }
+                    // sort distance to other factories
+                    target.distanceToOther.toList().sortedBy { it.second }.toMap().keys.forEach {
+                        if (myFactoryIDs.contains(it)) {
+                            // check if no bomb on the way to target factory
+                            if (gameData.bombs.none { bomb -> bomb.targetFactoryId == target.id }) {
+                                // on my closest factory found bomb time!
+                                return Pair(it, target.id)
+                            }
                         }
                     }
                 }
-            }
         }
     }
     return null
