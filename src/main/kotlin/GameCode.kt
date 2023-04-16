@@ -7,7 +7,7 @@ import java.math.*
 data class Factory(
     val id: Int,
     val owner: FactoryOwner,
-    val cyborgsCount: Int,
+    var cyborgsCount: Int,
     val production: Int,
     val turnsBeforeProduction: Int,
     val distanceToOther: MutableMap<Int, Int> = mutableMapOf(),
@@ -57,7 +57,8 @@ data class GameData(
     val factories: MutableList<Factory>,
     val troops: MutableList<Troop>,
     val bombs: MutableList<Bomb>,
-    var sentBombsCount: Int = 0
+    var sentBombsCount: Int = 0,
+    var idleTurnsInARow: Int = 0
 ) {
     fun clearData() {
         factories.clear()
@@ -90,6 +91,15 @@ data class GameData(
             }
         }.sortedBy {
             it.priority
+        }.let { sortedList ->
+            // completely ignore 0 production factories unless n IDLE turns
+            if (idleTurnsInARow < 5) {
+                sortedList.filter { factory ->
+                    factory.production > 0
+                }
+            } else {
+                sortedList
+            }
         }.reversed()
     }
 
@@ -229,8 +239,10 @@ fun main(args : Array<String>) {
 
         handleAll(gameData).joinToString(separator = "; ").let {
             if (it.isEmpty()) {
+                gameData.idleTurnsInARow ++
                 doNothing()
             } else {
+                gameData.idleTurnsInARow = 0
                 println(it)
             }
         }
@@ -279,6 +291,7 @@ private fun handleAll(gameData: GameData): List<String> {
                 }
 
                 if (myFactory.cyborgsCount >= requiredCyborgsCount && requiredCyborgsCount > 0) {
+                    myFactory.cyborgsCount -= requiredCyborgsCount
                     moveTroops(
                         sourceFactoryId = myFactory.id,
                         destinationFactory = targetFactory.id,
