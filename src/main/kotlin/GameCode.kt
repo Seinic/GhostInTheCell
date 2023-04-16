@@ -9,7 +9,8 @@ data class Factory(
     val production: Int,
     val turnsBeforeProduction: Int,
     val distanceToOther: MutableMap<Int, Int> = mutableMapOf(),
-    var priority: Float = 0f
+    var priority: Float = 0f,
+    var isMyBombTarget: Boolean = false
 ) {
     enum class FactoryOwner {
         ME,
@@ -164,6 +165,12 @@ data class GameData(
         activeEnemyBombs = listCopy
     }
 
+    fun updateMyBombTargets() {
+        bombs.filter { it.owner == Bomb.BombOwner.ME }.forEach { bomb ->
+            factories.firstOrNull { it.id == bomb.targetFactoryId }?.isMyBombTarget = true
+        }
+    }
+
     fun getTroopsOnTheWayTo(
         factory: Factory,
         owner: Troop.TroopOwner
@@ -275,6 +282,7 @@ fun main(args: Array<String>) {
             }
         }
         gameData.updateEnemyBombsData()
+        gameData.updateMyBombTargets()
 
         handleAll(gameData).joinToString(separator = "; ").let {
             if (it.isEmpty()) {
@@ -304,44 +312,46 @@ private fun handleAll(gameData: GameData): List<String> {
                 myFactory = myFactory
             ).let { priorityTargetsList ->
                 priorityTargetsList.filter { it.id != myFactory.id }.forEach { targetFactory ->
-                    val myCyborgsOnTheWayCount = gameData.getTroopsOnTheWayTo(
-                        factory = targetFactory,
-                        owner = Troop.TroopOwner.ME
-                    ).sumOf { it.cyborgsCount }
+                    if (targetFactory.isMyBombTarget.not()) {
+                        val myCyborgsOnTheWayCount = gameData.getTroopsOnTheWayTo(
+                            factory = targetFactory,
+                            owner = Troop.TroopOwner.ME
+                        ).sumOf { it.cyborgsCount }
 
-                    val enemyCyborgsOnTheWayCount = gameData.getTroopsOnTheWayTo(
-                        factory = targetFactory,
-                        owner = Troop.TroopOwner.ENEMY
-                    ).sumOf { it.cyborgsCount }
+                        val enemyCyborgsOnTheWayCount = gameData.getTroopsOnTheWayTo(
+                            factory = targetFactory,
+                            owner = Troop.TroopOwner.ENEMY
+                        ).sumOf { it.cyborgsCount }
 
-                    val requiredCyborgsCount = when (targetFactory.owner) {
-                        Factory.FactoryOwner.ME -> {
-                            enemyCyborgsOnTheWayCount - targetFactory.cyborgsCount
-                        }
+                        val requiredCyborgsCount = when (targetFactory.owner) {
+                            Factory.FactoryOwner.ME -> {
+                                enemyCyborgsOnTheWayCount - targetFactory.cyborgsCount
+                            }
 
-                        Factory.FactoryOwner.ENEMY -> {
-                            val reallyRequired =
-                                targetFactory.cyborgsCount + enemyCyborgsOnTheWayCount + 1 + (targetFactory.distanceToOther[myFactory.id]!! * targetFactory.production) - myCyborgsOnTheWayCount
-                            if (gameData.idleTurnsInARow > 15) {
-                                reallyRequired - gameData.idleTurnsInARow * 2
-                            } else {
-                                reallyRequired
+                            Factory.FactoryOwner.ENEMY -> {
+                                val reallyRequired =
+                                    targetFactory.cyborgsCount + enemyCyborgsOnTheWayCount + 1 + (targetFactory.distanceToOther[myFactory.id]!! * targetFactory.production) - myCyborgsOnTheWayCount
+                                if (gameData.idleTurnsInARow > 15) {
+                                    reallyRequired - gameData.idleTurnsInARow * 2
+                                } else {
+                                    reallyRequired
+                                }
+                            }
+
+                            Factory.FactoryOwner.NEUTRAL -> {
+                                targetFactory.cyborgsCount + enemyCyborgsOnTheWayCount + 1 - myCyborgsOnTheWayCount
                             }
                         }
 
-                        Factory.FactoryOwner.NEUTRAL -> {
-                            targetFactory.cyborgsCount + enemyCyborgsOnTheWayCount + 1 - myCyborgsOnTheWayCount
-                        }
-                    }
-
-                    if (myFactory.cyborgsCount >= requiredCyborgsCount && requiredCyborgsCount > 0) {
-                        myFactory.cyborgsCount -= requiredCyborgsCount
-                        moveTroops(
-                            sourceFactoryId = myFactory.id,
-                            destinationFactory = targetFactory.id,
-                            cyborgsCount = requiredCyborgsCount
-                        ).apply {
-                            actions.add(this)
+                        if (myFactory.cyborgsCount >= requiredCyborgsCount && requiredCyborgsCount > 0) {
+                            myFactory.cyborgsCount -= requiredCyborgsCount
+                            moveTroops(
+                                sourceFactoryId = myFactory.id,
+                                destinationFactory = targetFactory.id,
+                                cyborgsCount = requiredCyborgsCount
+                            ).apply {
+                                actions.add(this)
+                            }
                         }
                     }
                 }
