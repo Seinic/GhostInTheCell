@@ -1,7 +1,6 @@
 import java.util.*
 
 // todo if n idle, and this turn is idle, try send trom all factories to highest enemy priority
-// todo no rinforcements to my factory if enemy bomb otw
 
 // DATA
 data class Factory(
