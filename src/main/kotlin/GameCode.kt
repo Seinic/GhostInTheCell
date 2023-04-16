@@ -7,7 +7,7 @@ import java.math.*
 data class Factory(
     val id: Int,
     val owner: FactoryOwner,
-    val cyborgsCount: Int,
+    var cyborgsCount: Int,
     val production: Int,
     val turnsBeforeProduction: Int,
     val distanceToOther: MutableMap<Int, Int> = mutableMapOf(),
@@ -281,6 +281,7 @@ private fun handleAll(gameData: GameData): List<String> {
                 }
 
                 if (myFactory.cyborgsCount >= requiredCyborgsCount && requiredCyborgsCount > 0) {
+                    myFactory.cyborgsCount -= requiredCyborgsCount
                     moveTroops(
                         sourceFactoryId = myFactory.id,
                         destinationFactory = targetFactory.id,
