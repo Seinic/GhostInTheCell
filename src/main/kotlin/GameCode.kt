@@ -90,6 +90,8 @@ data class GameData(
             }
         }.sortedBy {
             it.priority
+        }.filter { // completely ignore 0 production factories
+            it.production > 0
         }.reversed()
     }
 
