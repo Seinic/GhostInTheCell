@@ -383,7 +383,7 @@ private fun bombTime(gameData: GameData): Pair<Int, Int>? {
         // check if no neutral factories (basically midgame check, so no bombs are sent at the start)
         if (gameData.factories.none { it.owner == Factory.FactoryOwner.NEUTRAL }) {
             // search for a 3 production enemy factory
-            gameData.factories.firstOrNull { it.owner == Factory.FactoryOwner.ENEMY && it.production == 3 }
+            gameData.factories.firstOrNull { it.owner == Factory.FactoryOwner.ENEMY && it.production == 3 && it.turnsBeforeProduction == 0}
                 ?.let { target ->
                     // create a list of all my factories ID
                     val myFactoryIDs = gameData.factories.filter { it.owner == Factory.FactoryOwner.ME }.map { it.id }
