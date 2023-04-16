@@ -340,7 +340,7 @@ private fun handleAll(gameData: GameData): List<String> {
 
                             Factory.FactoryOwner.ENEMY -> {
                                 val reallyRequired =
-                                    targetFactory.cyborgsCount + enemyCyborgsOnTheWayCount + 1 + (targetFactory.distanceToOther[myFactory.id]!! * targetFactory.production) - myCyborgsOnTheWayCount
+                                    targetFactory.cyborgsCount + enemyCyborgsOnTheWayCount + 1 + (targetFactory.distanceToOther[myFactory.id]!! * targetFactory.production + targetFactory.production) - myCyborgsOnTheWayCount
                                 if (gameData.idleTurnsInARow > 15) {
                                     reallyRequired - gameData.idleTurnsInARow * 2
                                 } else {
