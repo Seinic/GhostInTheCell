@@ -102,11 +102,12 @@ data class GameData(
             it.priority
         }.let { sortedList ->
             // completely ignore 0 production factories unless n IDLE turns
-            if (idleTurnsInARow < 5) {
+            if (idleTurnsInARow < 20) {
                 sortedList.filter { factory ->
                     factory.production > 0
                 }
             } else {
+                idleTurnsInARow = 0
                 sortedList
             }
         }.reversed()
