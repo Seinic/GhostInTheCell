@@ -1,6 +1,5 @@
 import java.util.*
 
-// todo no bomb issue
 // todo if n idle, and this turn is idle, try send trom all factories to highest enemy priority
 // todo no rinforcements to my factory if enemy bomb otw
 
@@ -393,9 +392,9 @@ private fun bombTime(gameData: GameData): Pair<Int, Int>? {
         // check if bombs still available to send
         if (gameData.mySentBombsCount < 2) {
             // check if no neutral factories (basically midgame check, so no bombs are sent at the start)
-            if (gameData.factories.none { it.owner == Factory.FactoryOwner.NEUTRAL && it.production == 0 }) {
+            if (gameData.factories.none { it.owner == Factory.FactoryOwner.NEUTRAL && it.production != 0 }) {
                 // search for a 3 production enemy factory
-                gameData.factories.firstOrNull { it.owner == Factory.FactoryOwner.ENEMY && it.production == 3 && it.turnsBeforeProduction != 0}
+                gameData.factories.firstOrNull { it.owner == Factory.FactoryOwner.ENEMY && it.production == 3 && it.turnsBeforeProduction == 0}
                     ?.let { target ->
                         // create a list of all my factories ID
                         val myFactoryIDs = gameData.factories.filter { it.owner == Factory.FactoryOwner.ME }.map { it.id }
