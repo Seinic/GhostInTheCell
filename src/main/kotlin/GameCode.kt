@@ -57,7 +57,8 @@ data class GameData(
     val factories: MutableList<Factory>,
     val troops: MutableList<Troop>,
     val bombs: MutableList<Bomb>,
-    var sentBombsCount: Int = 0
+    var sentBombsCount: Int = 0,
+    var idleTurnsInARow: Int = 0
 ) {
     fun clearData() {
         factories.clear()
@@ -90,8 +91,15 @@ data class GameData(
             }
         }.sortedBy {
             it.priority
-        }.filter { // completely ignore 0 production factories
-            it.production > 0
+        }.let { sortedList ->
+            // completely ignore 0 production factories unless n IDLE turns
+            if (idleTurnsInARow < 5) {
+                sortedList.filter { factory ->
+                    factory.production > 0
+                }
+            } else {
+                sortedList
+            }
         }.reversed()
     }
 
@@ -231,8 +239,10 @@ fun main(args : Array<String>) {
 
         handleAll(gameData).joinToString(separator = "; ").let {
             if (it.isEmpty()) {
+                gameData.idleTurnsInARow ++
                 doNothing()
             } else {
+                gameData.idleTurnsInARow = 0
                 println(it)
             }
         }
