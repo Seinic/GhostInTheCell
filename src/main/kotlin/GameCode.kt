@@ -70,7 +70,8 @@ data class GameData(
     var bombSentThisTurn: Boolean = false,
     var idleTurnsInARow: Int = 0,
     var activeEnemyBombs: List<Bomb.ActiveEnemyBomb> = listOf(),
-    var gameStage: GameStage = GameStage.OPENING
+    var gameStage: GameStage = GameStage.OPENING,
+    var myExpandTarget: Factory? = null
 ) {
 
     enum class GameStage {
@@ -78,6 +79,7 @@ data class GameData(
         MID_GAME,
         LATE_GAME
     }
+
     fun clearData() {
         factories.clear()
         troops.clear()
@@ -111,7 +113,7 @@ data class GameData(
             }
         }.onEach {
             if (it.owner != Factory.FactoryOwner.ME) {
-                it.priority = it.priority * (1 - myFactory.distanceToOther[it.id]!!*0.1f)
+                it.priority = it.priority * (1 - myFactory.distanceToOther[it.id]!! * 0.1f)
             }
         }.onEach {
             if (it.owner != Factory.FactoryOwner.ME) {
@@ -138,7 +140,6 @@ data class GameData(
             }
         }.reversed()
     }
-
 
 
     /*
@@ -291,6 +292,7 @@ fun main(args: Array<String>) {
         gameData.updateEnemyBombsData()
         gameData.updateMyBombTargets()
         gameData.updateGameStage()
+        debug("EXPAND ON TURN ${gameData.currentTurn} -> ${gameData.myExpandTarget?.id}")
 
         handleAll(gameData).joinToString(separator = "; ").let {
             if (it.isEmpty()) {
@@ -321,7 +323,7 @@ private fun handleAll(gameData: GameData): List<String> {
             gameData.mySentBombsCount++
             gameData.bombSentThisTurn = true
             actions.add("BOMB ${bombTimeResult.first} ${bombTimeResult.second}")
-        } else {
+        } else if (myFactory.id != gameData.myExpandTarget?.id) {
             gameData.getTargetFactoriesSortedByPriority(
                 myFactory = myFactory
             ).let { priorityTargetsList ->
@@ -348,7 +350,8 @@ private fun handleAll(gameData: GameData): List<String> {
                             }
 
                             Factory.FactoryOwner.ENEMY -> {
-                                val reallyRequired = targetFactory.cyborgsCount + enemyCyborgsOnTheWayCount + 1 + (targetFactory.distanceToOther[myFactory.id]!! * targetFactory.production + targetFactory.production) - myCyborgsOnTheWayCount
+                                val reallyRequired =
+                                    targetFactory.cyborgsCount + enemyCyborgsOnTheWayCount + 1 + (targetFactory.distanceToOther[myFactory.id]!! * targetFactory.production + targetFactory.production) - myCyborgsOnTheWayCount
                                 if (gameData.idleTurnsInARow > 15) {
                                     (reallyRequired - gameData.idleTurnsInARow * 2).coerceAtLeast(1)
                                 } else {
@@ -404,13 +407,15 @@ private fun bombTime(gameData: GameData): Pair<Int, Int>? {
                 // search for a 3 production enemy factory
                 gameData.factories.firstOrNull { targetFactory ->
                     targetFactory.owner == Factory.FactoryOwner.ENEMY &&
-                    targetFactory.production == 3 &&
-                    targetFactory.turnsBeforeProduction == 0 &&
-                    gameData.troops.filter { it.owner == Troop.TroopOwner.ME && it.targetFactoryId == targetFactory.id}.sumOf { it.cyborgsCount } < targetFactory.cyborgsCount
+                            targetFactory.production == 3 &&
+                            targetFactory.turnsBeforeProduction == 0 &&
+                            gameData.troops.filter { it.owner == Troop.TroopOwner.ME && it.targetFactoryId == targetFactory.id }
+                                .sumOf { it.cyborgsCount } < targetFactory.cyborgsCount
                 }
                     ?.let { target ->
                         // create a list of all my factories ID
-                        val myFactoryIDs = gameData.factories.filter { it.owner == Factory.FactoryOwner.ME }.map { it.id }
+                        val myFactoryIDs =
+                            gameData.factories.filter { it.owner == Factory.FactoryOwner.ME }.map { it.id }
                         // sort distance to other factories
                         target.distanceToOther.toList().sortedBy { it.second }.toMap().keys.forEach {
                             if (myFactoryIDs.contains(it)) {
@@ -430,52 +435,73 @@ private fun bombTime(gameData: GameData): Pair<Int, Int>? {
 
 private fun expandOnNeutrals(gameData: GameData): List<String> {
     if (gameData.gameStage == GameData.GameStage.MID_GAME) {
-        gameData.factories.filter { it.owner == Factory.FactoryOwner.NEUTRAL && it.production == 0 }.forEach { expandTarget ->
-            if (gameData.troops.filter { it.targetFactoryId == expandTarget.id }.isEmpty()) {
-                val myFactoriesIds = gameData.factories.filter { it.owner == Factory.FactoryOwner.ME }.map { it.id }
-                val enemyFactoriesIds = gameData.factories.filter { it.owner == Factory.FactoryOwner.ENEMY }.map { it.id }
+        if (gameData.myExpandTarget != null) {
+            return handleExpand(
+                gameData = gameData,
+                expandTarget = gameData.myExpandTarget!!
+            )
+        } else {
+            gameData.factories.filter { it.owner == Factory.FactoryOwner.NEUTRAL && it.production == 0 }.forEach { newTarget ->
+                handleExpand(
+                    gameData = gameData,
+                    expandTarget = newTarget
+                )
+            }
+        }
+    }
+    return listOf()
+}
 
-                var myAbsoluteDistance = 0
-                var enemyAbsoluteDistance = 0
-                expandTarget.distanceToOther.forEach { (t, u) ->
-                    if (myFactoriesIds.contains(t)) {
-                        myAbsoluteDistance += u
-                    }
-                    if (enemyFactoriesIds.contains(t)) {
-                        enemyAbsoluteDistance += u
-                    }
-                }
-                if (myAbsoluteDistance < enemyAbsoluteDistance) {
-                    var requiredCyborgs = expandTarget.cyborgsCount + 10
-                    val tmpActions = mutableListOf<String>()
-                    expandTarget.distanceToOther.toList().sortedBy { it.second }.toMap().keys.forEach { id ->
-                        if (myFactoriesIds.contains(id)) {
-                            gameData.factories.first { it.id == id }.let { potentialDonnor ->
-                                if (potentialDonnor.cyborgsCount > gameData.troops.filter {
-                                    it.targetFactoryId == potentialDonnor.id && it.owner == Troop.TroopOwner.ENEMY
-                                }.sumOf { it.cyborgsCount }) {
-                                    if (potentialDonnor.cyborgsCount < requiredCyborgs) {
-                                        tmpActions.add(
-                                            moveTroops(
-                                                sourceFactoryId = potentialDonnor.id,
-                                                destinationFactory = expandTarget.id,
-                                                cyborgsCount = potentialDonnor.cyborgsCount
-                                            )
-                                        )
-                                        requiredCyborgs -= potentialDonnor.cyborgsCount
-                                        potentialDonnor.cyborgsCount = 0
-                                    } else {
-                                        tmpActions.add(
-                                            moveTroops(
-                                                sourceFactoryId = potentialDonnor.id,
-                                                destinationFactory = expandTarget.id,
-                                                cyborgsCount = potentialDonnor.cyborgsCount - requiredCyborgs
-                                            )
-                                        )
-                                        potentialDonnor.cyborgsCount -= requiredCyborgs
-                                        return tmpActions
-                                    }
-                                }
+private fun handleExpand(gameData: GameData, expandTarget: Factory): List<String> {
+    if (gameData.troops.filter { it.targetFactoryId == expandTarget.id }.isEmpty()) {
+        debug("D4")
+        val myFactoriesIds = gameData.factories.filter { it.owner == Factory.FactoryOwner.ME }.map { it.id }
+        val enemyFactoriesIds = gameData.factories.filter { it.owner == Factory.FactoryOwner.ENEMY }.map { it.id }
+
+        var myAbsoluteDistance = 0
+        var enemyAbsoluteDistance = 0
+        expandTarget.distanceToOther.forEach { (t, u) ->
+            if (myFactoriesIds.contains(t)) {
+                myAbsoluteDistance += u
+            }
+            if (enemyFactoriesIds.contains(t)) {
+                enemyAbsoluteDistance += u
+            }
+        }
+        if (myAbsoluteDistance < enemyAbsoluteDistance) {
+            var requiredCyborgs = if (expandTarget.owner == Factory.FactoryOwner.ME) {
+                10 - expandTarget.cyborgsCount
+            } else {
+                expandTarget.cyborgsCount + 10
+            }
+            val tmpActions = mutableListOf<String>()
+            expandTarget.distanceToOther.toList().sortedBy { it.second }.toMap().keys.forEach { id ->
+                if (myFactoriesIds.contains(id)) {
+                    gameData.factories.first { it.id == id }.let { potentialDonnor ->
+                        if (potentialDonnor.cyborgsCount > gameData.troops.filter {
+                                it.targetFactoryId == potentialDonnor.id && it.owner == Troop.TroopOwner.ENEMY
+                            }.sumOf { it.cyborgsCount }) {
+                            if (potentialDonnor.cyborgsCount < requiredCyborgs) {
+                                tmpActions.add(
+                                    moveTroops(
+                                        sourceFactoryId = potentialDonnor.id,
+                                        destinationFactory = expandTarget.id,
+                                        cyborgsCount = potentialDonnor.cyborgsCount
+                                    )
+                                )
+                                requiredCyborgs -= potentialDonnor.cyborgsCount
+                                potentialDonnor.cyborgsCount = 0
+                            } else {
+                                tmpActions.add(
+                                    moveTroops(
+                                        sourceFactoryId = potentialDonnor.id,
+                                        destinationFactory = expandTarget.id,
+                                        cyborgsCount = potentialDonnor.cyborgsCount - requiredCyborgs
+                                    )
+                                )
+                                potentialDonnor.cyborgsCount -= requiredCyborgs
+                                gameData.myExpandTarget = expandTarget
+                                return tmpActions
                             }
                         }
                     }
@@ -494,7 +520,14 @@ fun Factory.shouldIncrement(gameData: GameData): Boolean {
                     factory = this,
                     owner = Troop.TroopOwner.ENEMY
                 ).sumOf { it.cyborgsCount }.let { incomingEnemies ->
-                    cyborgsCount > incomingEnemies
+                    if (cyborgsCount > incomingEnemies) {
+                        if (this.id == gameData.myExpandTarget?.id) {
+                            gameData.myExpandTarget = null
+                        }
+                        return true
+                    } else {
+                        return false
+                    }
                 }
             } else {
                 false
