@@ -213,7 +213,6 @@ fun main(args: Array<String>) {
     // game loop
     while (true) {
         gameData.clearData()
-        gameData.currentTurn++
         gameData.bombSentThisTurn = false
         val entityCount = input.nextInt() // the number of entities (e.g. factories and troops)
         for (i in 0 until entityCount) {
@@ -302,6 +301,7 @@ fun main(args: Array<String>) {
                 println(it)
             }
         }
+        gameData.currentTurn++
     }
 }
 
@@ -433,6 +433,13 @@ private fun bombTime(gameData: GameData): Pair<Int, Int>? {
 }
 
 private fun expandOnNeutrals(gameData: GameData): List<String> {
+    if (gameData.currentTurn == 0) {
+        gameData.factories.firstOrNull { it.owner == Factory.FactoryOwner.ME }?.let {
+            if (it.production == 0) {
+                gameData.myExpandTarget = it
+            }
+        }
+    }
     if (gameData.gameStage == GameData.GameStage.MID_GAME) {
         if (gameData.myExpandTarget != null) {
             return handleExpand(
