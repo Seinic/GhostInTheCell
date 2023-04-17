@@ -1,6 +1,7 @@
 import java.util.*
 
 // todo if n idle, and this turn is idle, try send trom all factories to highest enemy priority
+// todo if enemy factory prod 0 but truns before prod > 0 add to priority!!!
 
 // DATA
 data class Factory(
@@ -107,7 +108,6 @@ data class GameData(
                     factory.production > 0
                 }
             } else {
-                idleTurnsInARow = 0
                 sortedList
             }
         }.reversed()
@@ -316,10 +316,9 @@ private fun handleAll(gameData: GameData): List<String> {
                             }
 
                             Factory.FactoryOwner.ENEMY -> {
-                                val reallyRequired =
-                                    targetFactory.cyborgsCount + enemyCyborgsOnTheWayCount + 1 + (targetFactory.distanceToOther[myFactory.id]!! * targetFactory.production + targetFactory.production) - myCyborgsOnTheWayCount
+                                val reallyRequired = targetFactory.cyborgsCount + enemyCyborgsOnTheWayCount + 1 + (targetFactory.distanceToOther[myFactory.id]!! * targetFactory.production + targetFactory.production) - myCyborgsOnTheWayCount
                                 if (gameData.idleTurnsInARow > 15) {
-                                    reallyRequired - gameData.idleTurnsInARow * 2
+                                    (reallyRequired - gameData.idleTurnsInARow * 2).coerceAtLeast(1)
                                 } else {
                                     reallyRequired
                                 }
@@ -371,7 +370,12 @@ private fun bombTime(gameData: GameData): Pair<Int, Int>? {
             // check if no neutral factories (basically midgame check, so no bombs are sent at the start)
             if (gameData.factories.none { it.owner == Factory.FactoryOwner.NEUTRAL && it.production != 0 }) {
                 // search for a 3 production enemy factory
-                gameData.factories.firstOrNull { it.owner == Factory.FactoryOwner.ENEMY && it.production == 3 && it.turnsBeforeProduction == 0}
+                gameData.factories.firstOrNull { targetFactory ->
+                    targetFactory.owner == Factory.FactoryOwner.ENEMY &&
+                    targetFactory.production == 3 &&
+                    targetFactory.turnsBeforeProduction == 0 &&
+                    gameData.troops.filter { it.owner == Troop.TroopOwner.ME && it.targetFactoryId == targetFactory.id}.sumOf { it.cyborgsCount } < targetFactory.cyborgsCount
+                }
                     ?.let { target ->
                         // create a list of all my factories ID
                         val myFactoryIDs = gameData.factories.filter { it.owner == Factory.FactoryOwner.ME }.map { it.id }
