@@ -106,7 +106,7 @@ data class GameData(
         }.filter {
             it.id != myFactory.id
         }.onEach {
-            it.priority = if (it.production == 0) {
+            it.priority = if (it.production == 0 && it.turnsBeforeProduction == 0) {
                 -100000f
             } else {
                 it.priority * it.production * 3
@@ -125,7 +125,7 @@ data class GameData(
             // completely ignore 0 production factories unless n IDLE turns
             if (idleTurnsInARow < 20) {
                 sortedList.filter { factory ->
-                    factory.production > 0
+                    factory.production > 0 || factory.turnsBeforeProduction > 0
                 }
             } else {
                 sortedList
@@ -292,7 +292,6 @@ fun main(args: Array<String>) {
         gameData.updateEnemyBombsData()
         gameData.updateMyBombTargets()
         gameData.updateGameStage()
-        debug("EXPAND ON TURN ${gameData.currentTurn} -> ${gameData.myExpandTarget?.id}")
 
         handleAll(gameData).joinToString(separator = "; ").let {
             if (it.isEmpty()) {
@@ -454,7 +453,6 @@ private fun expandOnNeutrals(gameData: GameData): List<String> {
 
 private fun handleExpand(gameData: GameData, expandTarget: Factory): List<String> {
     if (gameData.troops.filter { it.targetFactoryId == expandTarget.id }.isEmpty()) {
-        debug("D4")
         val myFactoriesIds = gameData.factories.filter { it.owner == Factory.FactoryOwner.ME }.map { it.id }
         val enemyFactoriesIds = gameData.factories.filter { it.owner == Factory.FactoryOwner.ENEMY }.map { it.id }
 
