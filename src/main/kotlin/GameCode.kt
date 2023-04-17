@@ -113,30 +113,7 @@ data class GameData(
         }.reversed()
     }
 
-    fun shouldIncrement(factory: Factory): Boolean {
-        return if (factories.filter { it.owner == Factory.FactoryOwner.NEUTRAL }.isEmpty()) {
-            if (factory.owner == Factory.FactoryOwner.ME) {
-                if (factory.production < 3 && factory.cyborgsCount > 10) {
-                    getTroopsOnTheWayTo(
-                        factory = factory,
-                        owner = Troop.TroopOwner.ENEMY
-                    ).sumOf { it.cyborgsCount }.let { incomingEnemies ->
-                        if (factory.cyborgsCount > incomingEnemies) {
-                            true
-                        } else {
-                            false
-                        }
-                    }
-                } else {
-                    false
-                }
-            } else {
-                false
-            }
-        } else {
-            false
-        }
-    }
+
 
     /*
         if bomb no longer active remove from active enemy mobs list
@@ -306,7 +283,7 @@ private fun handleAll(gameData: GameData): List<String> {
     val bombTimeResult = bombTime(gameData)
 
     gameData.factories.filter { it.owner == Factory.FactoryOwner.ME }.forEach { myFactory ->
-        if (gameData.shouldIncrement(myFactory)) {
+        if (myFactory.shouldIncrement(gameData)) {
             actions.add("INC ${myFactory.id}")
         } else if (bombTimeResult != null && bombTimeResult.first == myFactory.id) {
             gameData.mySentBombsCount++
@@ -413,6 +390,26 @@ private fun bombTime(gameData: GameData): Pair<Int, Int>? {
         }
     }
     return null
+}
+fun Factory.shouldIncrement(gameData: GameData): Boolean {
+    return if (gameData.factories.none { it.owner == Factory.FactoryOwner.NEUTRAL && it.production != 0 }) {
+        if (owner == Factory.FactoryOwner.ME) {
+            if (production < 3 && cyborgsCount > 10) {
+                gameData.getTroopsOnTheWayTo(
+                    factory = this,
+                    owner = Troop.TroopOwner.ENEMY
+                ).sumOf { it.cyborgsCount }.let { incomingEnemies ->
+                    cyborgsCount > incomingEnemies
+                }
+            } else {
+                false
+            }
+        } else {
+            false
+        }
+    } else {
+        false
+    }
 }
 
 /*
