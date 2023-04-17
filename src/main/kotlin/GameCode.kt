@@ -433,13 +433,6 @@ private fun bombTime(gameData: GameData): Pair<Int, Int>? {
 }
 
 private fun expandOnNeutrals(gameData: GameData): List<String> {
-    if (gameData.currentTurn == 0) {
-        gameData.factories.firstOrNull { it.owner == Factory.FactoryOwner.ME }?.let {
-            if (it.production == 0) {
-                gameData.myExpandTarget = it
-            }
-        }
-    }
     if (gameData.gameStage == GameData.GameStage.MID_GAME) {
         if (gameData.myExpandTarget != null) {
             return handleExpand(
@@ -447,7 +440,7 @@ private fun expandOnNeutrals(gameData: GameData): List<String> {
                 expandTarget = gameData.myExpandTarget!!
             )
         } else {
-            gameData.factories.filter { it.owner == Factory.FactoryOwner.NEUTRAL && it.production == 0 }.forEach { newTarget ->
+            gameData.factories.filter { it.production == 0 }.forEach { newTarget ->
                 handleExpand(
                     gameData = gameData,
                     expandTarget = newTarget
